@@ -1,7 +1,7 @@
 
 import 'whatwg-fetch'
 
-const FILENAME = './grey.jpg'
+const FILENAME = './half.jpg'
 
 var res = null
 var buf = null
@@ -49,6 +49,32 @@ function blobToImageData( blob ) {
     })
 }
 
+function createView( data ) {
+    var buf = new ArrayBuffer( data.length )
+    var buf8 = new Uint8ClampedArray( buf )
+    var view = new Uint32Array( buf )
+
+    buf8.set( data.slice( 0 ) )
+
+    return [ buf, buf8, view ]
+}
+
+function putValue( view, pos, value ) {
+    console.log( 'use Uint32Array' )
+
+    view[ pos ] = ( 255 << 24 ) |
+        ( value << 16 ) |
+        ( value << 8 ) |
+        ( value )
+
+    return view
+}
+
+// Only returns red channel
+function getValue( value ) {
+    return ( value >> 16 ) & 0xff
+}
+
 function setRed( blob, value ) {
     console.log( 'Dropping red channel from image' )
     blobToImageData( blob )
@@ -58,6 +84,31 @@ function setRed( blob, value ) {
             }
 
             ctx.putImageData( imageData, 0, 0 )
+        })
+}
+
+function renderToCanvas( buf8 ) {
+    imageData.data.set( buf8 )
+    ctx.putImageData( imageData, 0, 0 )
+}
+
+// This is fairly dirty and can be improved, it was done hastily
+// Looks like theres some info in http://www.html5rocks.com/en/tutorials/canvas/imagefilters/
+function replaceColour( value ) {
+    var start = performance.now()
+    blobToImageData( blob )
+        .then( imageData => {
+            var bufs = createView( imageData.data )
+            var view = bufs[ 2 ]
+            for( let i = 0; i < view.length; i++ ) {
+                if ( getValue( view[ i ] ) === 128 ) {
+                    putValue( view, i, value || 0x88 )
+                }
+            }
+
+            imageData.data.set( bufs[ 1 ] )
+            ctx.putImageData( imageData, 0, 0 )
+            console.log( 'done in', performance.now() - start, 'ms' )
         })
 }
 
@@ -85,6 +136,11 @@ window.fromArray = fromArray
 window.blobToCanvas = blobToCanvas
 window.blobToImageData = blobToImageData
 window.setRed = setRed
+window.createView = createView
+window.putValue = putValue
+window.renderToCanvas = renderToCanvas
+window.getValue = getValue
+window.replaceColour = replaceColour
 
 window.canvas = canvas
 window.ctx = ctx
